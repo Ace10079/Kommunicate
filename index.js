@@ -62,6 +62,7 @@ app.post('/message', (req, res) => {
     } else {
         res.status(401).send('Unauthorized');
     }
+    return jsonify([{"message":"Webhook triggered"}])
 });
 
 // Start the server on port 3000
