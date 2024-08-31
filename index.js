@@ -13,32 +13,18 @@ mongoose.connect(mongoURI, { useNewUrlParser: true, useUnifiedTopology: true })
     .then(() => console.log('MongoDB connected'))
     .catch(err => console.log('MongoDB connection error: ', err));
 
-// Define a schema for storing chatbot messages
+// Define a simple schema for storing webhook messages
 const messageSchema = new mongoose.Schema({
     key: String,
-    from: String,
-    groupId: Number,
-    clientGroupId: String,
-    groupName: String,
     message: String,
-    timeStamp: Number,
-    receiverConnected: Boolean,
-    receiverLastSeenAtTime: Number,
-    file: {
-        name: String,
-        url: String,
-        contentType: String,
-        size: Number,
-        thumbnailUrl: String
-    },
-    metadata: Object
+    timeStamp: Number
 });
 
 // Create a model for the messages
 const Message = mongoose.model('Message', messageSchema);
 
 // Authentication token configuration
-const expectedAuthHeader = 'Basic YWJjZGVm';  // Base64 for 'abcdef'
+const expectedAuthHeader = 'Basic YWJjZGVm';  // Example Base64 token for 'abcdef'
 
 // Endpoint to receive webhook data
 app.post('/message', (req, res) => {
@@ -48,12 +34,17 @@ app.post('/message', (req, res) => {
     if (authHeader === expectedAuthHeader) {
         const messageData = req.body;
 
-        // Save the message data to the database
-        const newMessage = new Message(messageData);
+        // Create and save the message data to MongoDB
+        const newMessage = new Message({
+            key: messageData.key || "unknown",
+            message: messageData.message || "No message content",
+            timeStamp: Date.now()
+        });
+
         newMessage.save()
             .then(() => {
-                console.log('Message saved:', messageData);
-                res.status(200).send('Data received and stored');
+                console.log('Message saved:', newMessage);
+                res.status(200).json({ "message": "Webhook triggered and data stored successfully" });
             })
             .catch(err => {
                 console.error('Error saving message:', err);
@@ -62,7 +53,6 @@ app.post('/message', (req, res) => {
     } else {
         res.status(401).send('Unauthorized');
     }
-    return jsonify([{"message":"Webhook triggered"}])
 });
 
 // Start the server on port 3000
