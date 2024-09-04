@@ -11,18 +11,20 @@ mongoose.connect(mongoURI, { useNewUrlParser: true, useUnifiedTopology: true })
     .then(() => console.log('MongoDB connected'))
     .catch(err => console.log('MongoDB connection error:', err));
 
-// Define a schema for storing webhook messages
-const messageSchema = new mongoose.Schema({
-    key: String,
-    message: String,
-    from: String,
+// Define a schema for storing conversations
+const conversationSchema = new mongoose.Schema({
     groupId: String,
-    timeStamp: Number,
-    metadata: Object
+    messages: [{
+        key: String,
+        message: String,
+        from: String,
+        timeStamp: Number,
+        metadata: Object
+    }]
 });
 
-// Create a model for the messages
-const Message = mongoose.model('Message', messageSchema);
+// Create a model for the conversations
+const Conversation = mongoose.model('Conversation', conversationSchema);
 
 // Authentication token configuration
 const expectedAuthHeader = 'Basic YWJjZGVm';  // Example Base64 token for 'username:abcdef'
@@ -30,37 +32,49 @@ const expectedAuthHeader = 'Basic YWJjZGVm';  // Example Base64 token for 'usern
 // Endpoint to receive webhook data
 app.post('/message', async (req, res) => {
     try {
-      const receivedAuthHeader = req.headers.authorization;
-      
-      if (receivedAuthHeader === 'Basic YWJjZGVm') {
-        const data = req.body;
-        console.log('Received Data:', data);
-        
-        // Extract the required information from the request body
-        const { key, message, from, groupId, metadata } = data;
-        
-        // Save the data to MongoDB
-        const savedMessage = await Message.create({
-          key: key,
-          message: message,
-          from: from,
-          groupId: groupId.toString(),
-          timeStamp: Date.now(),
-          metadata: metadata
-        });
-        
-        console.log('Message saved:', savedMessage);
-        res.status(200).send('Message received and saved successfully.');
-      } else {
-        console.log('Received Auth Header:', receivedAuthHeader);
-        res.status(401).send('Unauthorized');
-      }
+        const receivedAuthHeader = req.headers.authorization;
+
+        if (receivedAuthHeader === expectedAuthHeader) {
+            const data = req.body;
+            console.log('Received Data:', data);
+
+            // Extract the required information from the request body
+            const { key, message, from, groupId, metadata } = data;
+
+            // Find the conversation by groupId
+            let conversation = await Conversation.findOne({ groupId: groupId.toString() });
+
+            if (!conversation) {
+                // If no conversation exists, create a new one
+                conversation = new Conversation({
+                    groupId: groupId.toString(),
+                    messages: []
+                });
+            }
+
+            // Add the new message to the conversation
+            conversation.messages.push({
+                key: key,
+                message: message,
+                from: from,
+                timeStamp: Date.now(),
+                metadata: metadata
+            });
+
+            // Save the updated conversation
+            const savedConversation = await conversation.save();
+
+            console.log('Conversation updated:', savedConversation);
+            res.status(200).send('Message received and conversation updated successfully.');
+        } else {
+            console.log('Received Auth Header:', receivedAuthHeader);
+            res.status(401).send('Unauthorized');
+        }
     } catch (error) {
-      console.error('Error saving message:', error);
-      res.status(500).send('Internal Server Error');
+        console.error('Error updating conversation:', error);
+        res.status(500).send('Internal Server Error');
     }
-  });
-  
+});
 
 // Start the server on port 3000
 const PORT = process.env.PORT || 3000;
