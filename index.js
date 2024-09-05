@@ -43,6 +43,12 @@ app.post('/message', async (req, res) => {
 
             const { groupId, messages } = data;
 
+            // Check if 'messages' is present and is an array
+            if (!Array.isArray(messages)) {
+                console.log('Invalid data format: messages is not an array.');
+                return res.status(400).send('Invalid data format: messages is not an array.');
+            }
+
             // Initialize an object to store structured data
             const complaintData = {
                 groupId: groupId.toString(),
